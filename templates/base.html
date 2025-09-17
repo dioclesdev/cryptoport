@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Crypto Bullrun Analyzer{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #1e3a8a;
+            --primary-light: #3b82f6;
+            --primary-dark: #1e40af;
+            --success-color: #059669;
+            --warning-color: #d97706;
+            --danger-color: #dc2626;
+            --info-color: #0284c7;
+            --dark-color: #111827;
+            --light-color: #f9fafb;
+            --secondary-color: #6b7280;
+            --border-radius: 0.375rem;
+            --box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        
+        /* Sidebar styling */
+        .sidebar {
+            min-height: 100vh;
+            background: var(--dark-color);
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 100;
+            transition: all 0.3s;
+        }
+        
+        .sidebar .nav-link {
+            color: #e5e7eb;
+            border-radius: var(--border-radius);
+            margin: 0.25rem 0;
+            padding: 0.75rem 1rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar .nav-link i {
+            margin-right: 0.75rem;
+            width: 1.25rem;
+            text-align: center;
+        }
+        
+        .sidebar .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            transform: translateX(3px);
+        }
+        
+        .sidebar .nav-link.active {
+            background: var(--primary-color);
+            color: #fff;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar-footer {
+            padding: 1rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: auto;
+        }
+        
+        /* Score styling with good contrast */
+        .score-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            display: inline-block;
+            text-align: center;
+            min-width: 3.5rem;
+        }
+        
+        .score-very-high { background: #dcfce7; color: #166534; }
+        .score-high { background: #dbeafe; color: #1e40af; }
+        .score-above-avg { background: #fef3c7; color: #92400e; }
+        .score-avg { background: #e5e7eb; color: #4b5563; }
+        .score-below-avg { background: #fee2e2; color: #991b1b; }
+        .score-low { background: #fecaca; color: #7f1d1d; }
+        
+        /* Status indicators */
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-online { background-color: var(--success-color); box-shadow: 0 0 5px var(--success-color); }
+        .status-offline { background-color: var(--danger-color); box-shadow: 0 0 5px var(--danger-color); }
+        .status-cache { background-color: var(--info-color); box-shadow: 0 0 5px var(--info-color); }
+        
+        /* Card styling */
+        .card {
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            border: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            overflow: hidden;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            font-weight: 600;
+            padding: 1rem;
+        }
+        
+        /* Navbar styling */
+        .navbar {
+            background: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        .navbar-nav .nav-link {
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            transition: all 0.2s;
+        }
+        
+        .navbar-nav .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        /* Charts */
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            box-shadow: var(--box-shadow);
+        }
+        
+        /* Stats cards */
+        .stats-card {
+            border-left: 4px solid var(--primary-color);
+            transition: all 0.2s ease;
+            background: white;
+        }
+        
+        .stats-card:hover {
+            border-left-width: 6px;
+        }
+        
+        .stats-card .card-body {
+            padding: 1.5rem;
+        }
+        
+        .stats-card h3 {
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 0.25rem;
+            font-size: 1.75rem;
+        }
+        
+        .stats-card p {
+            color: var(--secondary-color);
+            margin: 0;
+            font-weight: 500;
+        }
+        
+        /* Tables */
+        .crypto-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .crypto-table th {
+            background-color: #f8fafc;
+            color: var(--secondary-color);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            padding: 0.75rem 1rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .crypto-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            vertical-align: middle;
+        }
+        
+        .crypto-table tbody tr:hover {
+            background-color: #f9fafb;
+        }
+        
+        .crypto-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        /* Custom badges */
+        .badge-bullrun {
+            padding: 0.35rem 0.65rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .badge-sehr-hoch {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        
+        .badge-hoch {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .badge-ueberdurchschnittlich, 
+        .badge-ue-berdurchschnittlich {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-durchschnittlich {
+            background-color: #e5e7eb;
+            color: #4b5563;
+        }
+        
+        .badge-unterdurchschnittlich {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .badge-niedrig {
+            background-color: #fecaca;
+            color: #7f1d1d;
+        }
+        
+        /* Buttons */
+        .btn {
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+            border-color: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+        
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        /* Alerts */
+        .alert {
+            border-radius: var(--border-radius);
+            border: none;
+            box-shadow: var(--box-shadow);
+        }
+        
+        .alert-icon {
+            margin-right: 0.5rem;
+        }
+        
+        /* Loading modal */
+        .loading-spinner {
+            width: 3rem;
+            height: 3rem;
+            border-width: 0.25rem;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .sidebar {
+                min-height: auto;
+                width: 100%;
+            }
+            
+            .chart-container {
+                height: 300px;
+            }
+            
+            .sidebar-footer {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .chart-container {
+                height: 250px;
+            }
+            
+            .stats-card h3 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+    
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-chart-line me-2"></i> Crypto Bullrun Analyzer
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item d-flex align-items-center me-3">
+                        <span class="text-light d-flex align-items-center">
+                            <span class="status-indicator status-cache"></span>
+                            {{ cache_status or 'Cache Mode' }}
+                        </span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link d-flex align-items-center" href="#" onclick="refreshData(event)">
+                            <i class="fas fa-sync-alt me-2" id="refresh-icon"></i> Refresh
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 d-md-block sidebar collapse" id="sidebarMenu">
+                <div class="d-flex flex-column h-100 py-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link {{ 'active' if request.endpoint == 'dashboard' }}" href="/">
+                                <i class="fas fa-tachometer-alt"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ 'active' if request.endpoint and 'watchlist' in request.endpoint }}" href="/watchlist">
+                                <i class="fas fa-eye"></i> Watchlist
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ 'active' if request.endpoint and 'portfolio' in request.endpoint }}" href="/portfolio">
+                                <i class="fas fa-wallet"></i> Portfolio
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ 'active' if request.endpoint and 'top200' in request.endpoint }}" href="/top200">
+                                <i class="fas fa-trophy"></i> Top 200
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ 'active' if request.endpoint and 'hardware' in request.endpoint }}" href="/hardware">
+                                <i class="fas fa-lock"></i> Hardware Wallet
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ 'active' if request.endpoint and 'cache' in request.endpoint }}" href="/cache-status">
+                                <i class="fas fa-database"></i> Cache Status
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ 'active' if request.endpoint and 'docs' in request.endpoint }}" href="/docs">
+                                <i class="fas fa-book"></i> Documentation
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <div class="sidebar-footer mt-auto">
+                        <div class="px-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="status-indicator {{ 'status-online' if auto_refresh_enabled else 'status-offline' }}"></div>
+                                <small class="text-light">{{ 'Auto-refresh Active' if auto_refresh_enabled else 'Auto-refresh Off' }}</small>
+                            </div>
+                            <div class="text-light opacity-75 small">
+                                <div>Cache: {{ cache_status | title }}</div>
+                                <div>Version: 2.0.0</div>
+                                <div>Last update: {{ last_update|default(current_time.strftime('%H:%M'), true) }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="mt-3">
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                    <i class="fas fa-{{ 'exclamation-circle' if category == 'error' else 'info-circle' if category == 'info' else 'check-circle' if category == 'success' else 'bell' }} alert-icon"></i>
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+                
+                <!-- Page Content -->
+                {% block content %}{% endblock %}
+                
+                <!-- Footer -->
+                <footer class="mt-5 pt-3 pb-2 border-top text-center text-muted small">
+                    <p>&copy; 2025 Crypto Bullrun Analyzer | <a href="/docs">Documentation</a> | <a href="/cache-status">System Status</a></p>
+                </footer>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Loading Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="loadingModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-body text-center py-4">
+                    <div class="spinner-border text-primary loading-spinner mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h5 id="loadingText" class="mb-2">Processing...</h5>
+                    <p class="text-muted mb-0" id="loadingSubtext">This may take a few moments</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Global utility functions
+        function refreshData(event) {
+            if (event) event.preventDefault();
+            
+            const icon = document.getElementById('refresh-icon');
+            if (icon) {
+                icon.classList.add('fa-spin');
+            }
+            
+            showToast('Refreshing data...', 'info');
+            
+            fetch('/api/refresh')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        showToast('Data refreshed successfully!', 'success');
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showToast('Error: ' + data.message, 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error refreshing data:', error);
+                    showToast('Network error: ' + error.message, 'danger');
+                })
+                .finally(() => {
+                    if (icon) {
+                        icon.classList.remove('fa-spin');
+                    }
+                });
+        }
+        
+        // Toast notification
+        function showToast(message, type = 'info') {
+            // Create toast container if it doesn't exist
+            let toastContainer = document.querySelector('.toast-container');
+            
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                document.body.appendChild(toastContainer);
+            }
+            
+            // Create toast element
+            const toastId = 'toast-' + Date.now();
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type} border-0`;
+            toast.id = toastId;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            
+            // Toast content
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+            
+            // Add to container
+            toastContainer.appendChild(toast);
+            
+            // Initialize and show toast
+            const bsToast = new bootstrap.Toast(toast, {
+                autohide: true,
+                delay: 5000
+            });
+            
+            bsToast.show();
+            
+            // Remove from DOM after hiding
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
+            });
+        }
+        
+        // Alert with dismissible component
+        function showAlert(message, type = 'info') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.setAttribute('role', 'alert');
+            
+            alertDiv.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            const container = document.querySelector('main');
+            if (container) {
+                container.insertBefore(alertDiv, container.firstChild);
+                
+                // Auto dismiss after 5 seconds
+                setTimeout(() => {
+                    if (alertDiv.parentNode) {
+                        alertDiv.remove();
+                    }
+                }, 5000);
+            }
+        }
+        
+        // Loading dialog
+        function showLoading(text = 'Processing...', subtext = 'This may take a few moments') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingSubtext').textContent = subtext;
+            const modal = new bootstrap.Modal(document.getElementById('loadingModal'));
+            modal.show();
+            return modal; // Return modal instance for manual hiding
+        }
+        
+        function hideLoading() {
+            const modalElement = document.getElementById('loadingModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) {
+                modal.hide();
+            }
+        }
+        
+        // Legacy function names for compatibility
+        function showProgressModal(text, subtext) {
+            return showLoading(text, subtext);
+        }
+        
+        function hideProgressModal() {
+            hideLoading();
+        }
+        
+        // Formatting utilities
+        function formatCurrency(value) {
+            if (value === null || value === undefined || isNaN(value)) {
+                return '$0.00';
+            }
+            
+            const formatter = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 6
+            });
+            
+            const absValue = Math.abs(value);
+            if (absValue >= 1e12) {
+                return formatter.format(value / 1e12).replace('$', '$') + 'T';
+            } else if (absValue >= 1e9) {
+                return formatter.format(value / 1e9).replace('$', '$') + 'B';
+            } else if (absValue >= 1e6) {
+                return formatter.format(value / 1e6).replace('$', '$') + 'M';
+            } else if (absValue >= 1e3) {
+                return formatter.format(value / 1e3).replace('$', '$') + 'K';
+            } else if (absValue >= 1) {
+                return formatter.format(value);
+            } else {
+                // For small values, show more decimal places
+                return formatter.format(value);
+            }
+        }
+        
+        function formatPercentage(value, decimals = 2) {
+            if (value === null || value === undefined || isNaN(value)) {
+                return 'N/A';
+            }
+            
+            const sign = value > 0 ? '+' : '';
+            return `${sign}${parseFloat(value).toFixed(decimals)}%`;
+        }
+        
+        function formatNumber(value, decimals = 2) {
+            if (value === null || value === undefined || isNaN(value)) {
+                return '0';
+            }
+            
+            const formatter = new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: decimals
+            });
+            
+            return formatter.format(value);
+        }
+        
+        // Score classification helpers
+        function getScoreClass(score) {
+            if (score >= 0.8) return 'score-very-high';
+            if (score >= 0.7) return 'score-high';
+            if (score >= 0.6) return 'score-above-avg';
+            if (score >= 0.5) return 'score-avg';
+            if (score >= 0.4) return 'score-below-avg';
+            return 'score-low';
+        }
+        
+        function getScoreBadge(score) {
+            const scoreClass = getScoreClass(score);
+            return `<span class="score-badge ${scoreClass}">${score.toFixed(3)}</span>`;
+        }
+        
+        function getPotentialBadge(potential) {
+            // Normalize potential category name
+            const normalizedPotential = potential.toLowerCase()
+                .replace('ü', 'ue')
+                .replace('ä', 'ae')
+                .replace('ö', 'oe')
+                .replace(' ', '-');
+            
+            return `<span class="badge-bullrun badge-${normalizedPotential}">${potential}</span>`;
+        }
+        
+        // Auto-refresh functionality
+        let autoRefreshInterval;
+        const AUTO_REFRESH_MINUTES = {{ auto_refresh_minutes|default(5, true) }};
+        
+        function startAutoRefresh() {
+            stopAutoRefresh(); // Clear any existing interval
+            
+            console.log(`Setting up auto-refresh every ${AUTO_REFRESH_MINUTES} minutes`);
+            
+            autoRefreshInterval = setInterval(() => {
+                if (document.visibilityState === 'visible') {
+                    console.log('Auto-refreshing data...');
+                    refreshData();
+                }
+            }, AUTO_REFRESH_MINUTES * 60 * 1000);
+        }
+        
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Start auto-refresh when page loads (if enabled)
+            {% if auto_refresh_enabled|default(true) %}
+            startAutoRefresh();
+            {% endif %}
+            
+            // Visibility API to pause auto-refresh when tab is not visible
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'visible' && {{ auto_refresh_enabled|default(true)|tojson }}) {
+                    startAutoRefresh();
+                } else {
+                    stopAutoRefresh();
+                }
+            });
+            
+            // Initialize all tooltips
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function(tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            
+            // Close mobile menu when link is clicked
+            const navLinks = document.querySelectorAll('.sidebar .nav-link');
+            const navbarCollapse = document.getElementById('sidebarMenu');
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth < 768) {
+                        const bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse);
+                        if (bsCollapse) {
+                            bsCollapse.hide();
+                        }
+                    }
+                });
+            });
+        });
+        
+        // Custom event for page-specific initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            // Dispatch an event when the page is fully loaded
+            document.dispatchEvent(new Event('page:loaded'));
+        });
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,107 @@
+# Core Dependencies
+Flask==3.0.0
+flask-cors==4.0.0
+python-dotenv==1.0.0
+requests==2.31.0
+
+# Database
+SQLAlchemy==2.0.23
+alembic==1.13.0
+psycopg2-binary==2.9.9  # For PostgreSQL support
+
+# API Clients
+python-binance==1.0.19
+pycoingecko==3.1.0
+
+# Data Processing
+pandas==2.1.4
+numpy==1.26.2
+
+# Visualization
+matplotlib==3.8.2
+plotly==5.18.0
+seaborn==0.13.0
+
+# Security
+cryptography==41.0.7
+bcrypt==4.1.2
+PyJWT==2.8.0
+
+# Task Queue (Optional)
+celery==5.3.4
+redis==5.0.1
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-flask==1.3.0
+faker==20.1.0
+
+# Development Tools
+black==23.12.0
+flake8==6.1.0
+mypy==1.7.1
+pre-commit==3.5.0
+
+# Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==2.0.0
+
+# Utilities
+click==8.1.7
+colorama==0.4.6
+tabulate==0.9.0
+python-dateutil==2.8.2
+
+# Export Features
+reportlab==4.0.7
+openpyxl==3.1.2
+xlsxwriter==3.1.9
+
+# Web Scraping (Optional)
+beautifulsoup4==4.12.2
+selenium==4.16.0
+
+# Logging
+loguru==0.7.2
+
+# Caching
+cachetools==5.3.2
+Flask-Caching==2.1.0
+
+# Forms and Validation
+flask-wtf==1.2.1
+WTForms==3.1.1
+marshmallow==3.20.1
+
+# Authentication (Optional)
+Flask-Login==0.6.3
+Flask-Session==0.5.0
+
+# CORS and Security Headers
+flask-talisman==1.1.0
+
+# Rate Limiting
+Flask-Limiter==3.5.0
+
+# Background Jobs
+APScheduler==3.10.4
+
+# Environment Management
+python-decouple==3.8
+
+# HTTP Client Enhancements
+httpx==0.25.2
+aiohttp==3.9.1
+
+# Time and Date
+arrow==1.3.0
+pytz==2023.3
+
+# CLI Enhancement
+rich==13.7.0
+typer==0.9.0
+
+# Configuration Management
+pydantic==2.5.2
+pydantic-settings==2.1.0

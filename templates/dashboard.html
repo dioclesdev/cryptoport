@@ -1,0 +1,844 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Crypto Bullrun Analyzer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i class="fas fa-chart-line text-primary"></i> Crypto Dashboard</h1>
+            <div>
+                <span class="badge bg-info me-2">{{ cache_status }}</span>
+                <button class="btn btn-primary" onclick="refreshData()">
+                    <i class="fas fa-sync-alt" id="refresh-icon"></i> Refresh
+                </button>
+            </div>
+        </div>
+        {% if last_update %}
+        <small class="text-muted">
+            <i class="fas fa-clock"></i> Last update: {{ last_update | replace('T', ' ') }}
+        </small>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+{% if stats %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stats-card border-primary">
+            <div class="card-body text-center">
+                <i class="fas fa-coins fa-2x text-primary mb-2"></i>
+                <h3 class="text-primary">{{ stats.total_coins }}</h3>
+                <p class="mb-0 text-muted">Analyzed Coins</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card border-success">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-line fa-2x text-success mb-2"></i>
+                <h3 class="text-success">{{ "%.3f"|format(stats.avg_score) }}</h3>
+                <p class="mb-0 text-muted">Avg. Score</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card border-warning">
+            <div class="card-body text-center">
+                <i class="fas fa-trophy fa-2x text-warning mb-2"></i>
+                <h3 class="text-warning">{{ stats.top_performers }}</h3>
+                <p class="mb-0 text-muted">Top Performers</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card border-danger">
+            <div class="card-body text-center">
+                <i class="fas fa-rocket fa-2x text-danger mb-2"></i>
+                <h3 class="text-danger">{{ stats.very_high_potential }}</h3>
+                <p class="mb-0 text-muted">Very High Potential</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Charts Section -->
+{% if charts %}
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Top Coins Performance</h5>
+            </div>
+            <div class="card-body">
+                {% if charts.top_coins %}
+                    <div class="chart-container">
+                        <img src="{{ charts.top_coins }}" class="img-fluid" alt="Top Coins Chart" style="max-height: 400px; width: 100%;">
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="text-muted mt-2">Chart being generated...</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Score Distribution</h5>
+            </div>
+            <div class="card-body">
+                {% if charts.distribution %}
+                    <div class="chart-container">
+                        <img src="{{ charts.distribution }}" class="img-fluid" alt="Distribution Chart" style="max-height: 400px; width: 100%;">
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-success" role="status"></div>
+                        <p class="text-muted mt-2">Chart being generated...</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Main Watchlist Table -->
+{% if watchlist_analysis and watchlist_analysis.coins %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card shadow">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 text-dark">
+                    <i class="fas fa-list text-primary"></i> Complete Watchlist 
+                    <span class="badge bg-primary ms-2">{{ watchlist_analysis.coins|length }} Coins</span>
+                </h5>
+                <div>
+                    <a href="/watchlist" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-edit"></i> Manage
+                    </a>
+                    <button class="btn btn-sm btn-success" onclick="exportToCSV()">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover crypto-table">
+                        <thead>
+                            <tr>
+                                <th><i class="fas fa-hashtag"></i> Rank</th>
+                                <th><i class="fas fa-coins"></i> Symbol</th>
+                                <th><i class="fas fa-tag"></i> Name</th>
+                                <th><i class="fas fa-star"></i> Score</th>
+                                <th><i class="fas fa-chart-line"></i> Potential</th>
+                                <th><i class="fas fa-dollar-sign"></i> Price (USD)</th>
+                                <th><i class="fas fa-chart-area"></i> Market Cap</th>
+                                <th><i class="fas fa-tools"></i> Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for coin in watchlist_analysis.coins %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-secondary">{{ loop.index }}</span>
+                                </td>
+                                <td>
+                                    <strong class="text-primary">{{ coin.symbol }}</strong>
+                                </td>
+                                <td>
+                                    <span class="text-dark">{{ coin.name }}</span>
+                                </td>
+                                <td>
+                                    <span class="score-badge {{ getScoreClass(coin.bullrun_score) }}">
+                                        {{ "%.3f"|format(coin.bullrun_score) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge {{ getPotentialClass(coin.bullrun_potential) }}">
+                                        {{ coin.bullrun_potential }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="font-monospace text-success">
+                                        ${{ "%.4f"|format(coin.current_price) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="font-monospace text-info">
+                                        {% set market_cap = coin.market_cap_usd %}
+                                        {% if market_cap >= 1000000000000 %}
+                                            ${{ "%.2f"|format(market_cap/1000000000000) }}T
+                                        {% elif market_cap >= 1000000000 %}
+                                            ${{ "%.2f"|format(market_cap/1000000000) }}B
+                                        {% elif market_cap >= 1000000 %}
+                                            ${{ "%.2f"|format(market_cap/1000000) }}M
+                                        {% elif market_cap >= 1000 %}
+                                            ${{ "%.2f"|format(market_cap/1000) }}K
+                                        {% else %}
+                                            ${{ "%.2f"|format(market_cap) }}
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button class="btn btn-outline-primary" onclick="showCoinDetails('{{ coin.symbol }}')" title="View Details">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                        <button class="btn btn-outline-success" onclick="addToPortfolio('{{ coin.symbol }}', {{ coin.current_price }})" title="Add to Portfolio">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<!-- No Data Available State -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card shadow border-warning">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-chart-line fa-4x text-warning mb-4"></i>
+                <h3 class="text-dark">No Analysis Data Available</h3>
+                <p class="text-muted mb-4">
+                    No watchlist analysis found. Click "Refresh" to load data or check 
+                    <a href="/cache-status" class="text-decoration-none">Cache Status</a> for available files.
+                </p>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                    <button class="btn btn-primary btn-lg" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i> Load Data
+                    </button>
+                    <a href="/watchlist" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-plus"></i> Add Coins
+                    </a>
+                    <a href="/cache-status" class="btn btn-outline-secondary btn-lg">
+                        <i class="fas fa-database"></i> Check Cache
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Potential Categories Section -->
+{% if watchlist_analysis and watchlist_analysis.potential_categories %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card shadow">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-filter"></i> Coins by Potential Category</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% if watchlist_analysis.potential_categories.very_high %}
+                    <div class="col-md-4 col-lg-2 mb-3">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white text-center">
+                                <strong>Very High</strong><br>
+                                <small>({{ watchlist_analysis.potential_categories.very_high|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in watchlist_analysis.potential_categories.very_high %}
+                                <span class="badge bg-success m-1 coin-badge" onclick="showCoinDetails('{{ symbol }}')">{{ symbol }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if watchlist_analysis.potential_categories.high %}
+                    <div class="col-md-4 col-lg-2 mb-3">
+                        <div class="card border-info">
+                            <div class="card-header bg-info text-white text-center">
+                                <strong>High</strong><br>
+                                <small>({{ watchlist_analysis.potential_categories.high|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in watchlist_analysis.potential_categories.high %}
+                                <span class="badge bg-info m-1 coin-badge" onclick="showCoinDetails('{{ symbol }}')">{{ symbol }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if watchlist_analysis.potential_categories.above_average %}
+                    <div class="col-md-4 col-lg-2 mb-3">
+                        <div class="card border-warning">
+                            <div class="card-header bg-warning text-dark text-center">
+                                <strong>Above Average</strong><br>
+                                <small>({{ watchlist_analysis.potential_categories.above_average|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in watchlist_analysis.potential_categories.above_average %}
+                                <span class="badge bg-warning text-dark m-1 coin-badge" onclick="showCoinDetails('{{ symbol }}')">{{ symbol }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if watchlist_analysis.potential_categories.average %}
+                    <div class="col-md-4 col-lg-2 mb-3">
+                        <div class="card border-secondary">
+                            <div class="card-header bg-secondary text-white text-center">
+                                <strong>Average</strong><br>
+                                <small>({{ watchlist_analysis.potential_categories.average|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in watchlist_analysis.potential_categories.average %}
+                                <span class="badge bg-secondary m-1 coin-badge" onclick="showCoinDetails('{{ symbol }}')">{{ symbol }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if watchlist_analysis.potential_categories.below_average %}
+                    <div class="col-md-4 col-lg-2 mb-3">
+                        <div class="card border-dark">
+                            <div class="card-header bg-dark text-white text-center">
+                                <strong>Below Average</strong><br>
+                                <small>({{ watchlist_analysis.potential_categories.below_average|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in watchlist_analysis.potential_categories.below_average %}
+                                <span class="badge bg-dark m-1 coin-badge" onclick="showCoinDetails('{{ symbol }}')">{{ symbol }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if watchlist_analysis.potential_categories.low %}
+                    <div class="col-md-4 col-lg-2 mb-3">
+                        <div class="card border-danger">
+                            <div class="card-header bg-danger text-white text-center">
+                                <strong>Low</strong><br>
+                                <small>({{ watchlist_analysis.potential_categories.low|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in watchlist_analysis.potential_categories.low %}
+                                <span class="badge bg-danger m-1 coin-badge" onclick="showCoinDetails('{{ symbol }}')">{{ symbol }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Information and Quick Actions Section -->
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> About Crypto Bullrun Analyzer</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-dark">
+                    The Crypto Bullrun Analyzer is a comprehensive analysis suite for cryptocurrencies that evaluates 
+                    the potential of various coins for the next bull market cycle using advanced multi-factor scoring.
+                </p>
+                
+                <h6 class="mt-3 text-primary">Key Features:</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        <strong>Multi-Factor Analysis:</strong> Evaluates 8 different factors to determine bull run potential
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        <strong>Portfolio Management:</strong> Track and analyze your crypto holdings with P&L
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        <strong>Hardware Wallet Integration:</strong> Import data from Ledger, Trezor and other wallets
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        <strong>Top 200 Analysis:</strong> Comprehensive scanning of top cryptocurrencies
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check-circle text-success me-2"></i>
+                        <strong>Automatic Reports:</strong> Scheduled email reports with charts and analysis
+                    </li>
+                </ul>
+                
+                <div class="mt-3">
+                    <a href="/docs" class="btn btn-outline-primary">
+                        <i class="fas fa-book"></i> Documentation
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-rocket"></i> Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <a href="/watchlist" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-eye"></i><br>
+                            <small>Manage Watchlist</small>
+                        </a>
+                    </div>
+                    <div class="col-6">
+                        <a href="/portfolio" class="btn btn-outline-success w-100">
+                            <i class="fas fa-wallet"></i><br>
+                            <small>View Portfolio</small>
+                        </a>
+                    </div>
+                    <div class="col-6">
+                        <a href="/top200" class="btn btn-outline-info w-100">
+                            <i class="fas fa-trophy"></i><br>
+                            <small>Top 200 Analysis</small>
+                        </a>
+                    </div>
+                    <div class="col-6">
+                        <a href="/hardware" class="btn btn-outline-warning w-100">
+                            <i class="fas fa-lock"></i><br>
+                            <small>Hardware Wallet</small>
+                        </a>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <button class="btn btn-primary w-100" onclick="refreshData()">
+                            <i class="fas fa-sync-alt"></i> Refresh All Analysis Data
+                        </button>
+                    </div>
+                </div>
+                
+                <hr class="my-3">
+                
+                <div class="text-center">
+                    <h6 class="text-primary">Scoring System Guide:</h6>
+                    <div class="d-flex justify-content-around flex-wrap">
+                        <small class="text-center">
+                            <i class="fas fa-circle text-success"></i><br>
+                            <strong>High</strong><br>
+                            ≥0.7
+                        </small>
+                        <small class="text-center">
+                            <i class="fas fa-circle text-warning"></i><br>
+                            <strong>Medium</strong><br>
+                            ≥0.5
+                        </small>
+                        <small class="text-center">
+                            <i class="fas fa-circle text-danger"></i><br>
+                            <strong>Low</strong><br>
+                            &lt;0.5
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add to Portfolio Modal -->
+<div class="modal fade" id="addToPortfolioModal" tabindex="-1" aria-labelledby="addToPortfolioModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addToPortfolioModalLabel">
+                    <i class="fas fa-plus text-success"></i> Add to Portfolio
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="portfolioForm">
+                    <input type="hidden" id="portfolioSymbol">
+                    <input type="hidden" id="portfolioCurrentPrice">
+                    
+                    <div class="mb-3">
+                        <label for="portfolioAmount" class="form-label">Amount</label>
+                        <input type="number" class="form-control" id="portfolioAmount" 
+                               step="0.00000001" min="0.00000001" required
+                               placeholder="0.00000000">
+                        <div class="form-text">How much of this cryptocurrency do you own?</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="portfolioAvgPrice" class="form-label">Average Purchase Price (USD)</label>
+                        <input type="number" class="form-control" id="portfolioAvgPrice" 
+                               step="0.01" min="0.01" required
+                               placeholder="0.00">
+                        <div class="form-text">Average price you paid per unit</div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="fas fa-info-circle"></i>
+                            Current price will be used for performance calculations.
+                        </small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="submitToPortfolio()">
+                    <i class="fas fa-plus"></i> Add to Portfolio
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .coin-badge {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .coin-badge:hover {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+    
+    .stats-card {
+        transition: transform 0.2s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .score-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.375rem;
+        font-weight: 600;
+        display: inline-block;
+        text-align: center;
+        min-width: 3.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Dashboard specific JavaScript functions
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Dashboard initialized');
+        
+        // Initialize tooltips if present
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        
+        // Handle modal cleanup on hidden
+        const portfolioModal = document.getElementById('addToPortfolioModal');
+        if (portfolioModal) {
+            portfolioModal.addEventListener('hidden.bs.modal', function () {
+                // Reset form when modal is closed
+                const form = document.getElementById('portfolioForm');
+                if (form) {
+                    form.reset();
+                }
+                
+                // Reset button state
+                const submitBtn = document.querySelector('#addToPortfolioModal .btn-success');
+                if (submitBtn) {
+                    submitBtn.innerHTML = '<i class="fas fa-plus"></i> Add to Portfolio';
+                    submitBtn.disabled = false;
+                }
+            });
+        }
+    });
+    
+    // Format currency helper
+    function formatCurrency(value) {
+        if (value === null || value === undefined || isNaN(value)) {
+            return '$0.00';
+        }
+        
+        const absValue = Math.abs(value);
+        if (absValue >= 1e12) {
+            return '$' + (value / 1e12).toFixed(2) + 'T';
+        } else if (absValue >= 1e9) {
+            return '$' + (value / 1e9).toFixed(2) + 'B';
+        } else if (absValue >= 1e6) {
+            return '$' + (value / 1e6).toFixed(2) + 'M';
+        } else if (absValue >= 1e3) {
+            return '$' + (value / 1e3).toFixed(2) + 'K';
+        } else {
+            return '$' + value.toFixed(2);
+        }
+    }
+    
+    // Show coin details function
+    function showCoinDetails(symbol) {
+        if (!symbol) return;
+        
+        // Open CoinMarketCap in new tab
+        const url = `https://coinmarketcap.com/currencies/${symbol.toLowerCase()}/`;
+        window.open(url, '_blank');
+    }
+    
+    // Add to portfolio function - IMPROVED VERSION
+    function addToPortfolio(symbol, currentPrice) {
+        if (!symbol || !currentPrice) {
+            showAlert('Invalid coin data', 'warning');
+            return;
+        }
+        
+        try {
+            // Get modal element
+            const modalElement = document.getElementById('addToPortfolioModal');
+            if (!modalElement) {
+                console.error('Portfolio modal not found');
+                showAlert('Interface error - please refresh the page', 'danger');
+                return;
+            }
+            
+            // Set modal values
+            const symbolInput = document.getElementById('portfolioSymbol');
+            const currentPriceInput = document.getElementById('portfolioCurrentPrice');
+            const amountInput = document.getElementById('portfolioAmount');
+            const avgPriceInput = document.getElementById('portfolioAvgPrice');
+            
+            if (!symbolInput || !currentPriceInput || !amountInput || !avgPriceInput) {
+                console.error('Portfolio form inputs not found');
+                showAlert('Form error - please refresh the page', 'danger');
+                return;
+            }
+            
+            // Clear any existing modal state
+            const existingModal = bootstrap.Modal.getInstance(modalElement);
+            if (existingModal) {
+                existingModal.dispose();
+            }
+            
+            // Set form values
+            symbolInput.value = symbol;
+            currentPriceInput.value = currentPrice;
+            amountInput.value = '';
+            avgPriceInput.value = currentPrice;
+            
+            // Create and show modal
+            const modal = new bootstrap.Modal(modalElement, {
+                backdrop: 'static',
+                keyboard: true
+            });
+            
+            modal.show();
+            
+            // Focus on amount field after modal is shown
+            modalElement.addEventListener('shown.bs.modal', function focusAmount() {
+                amountInput.focus();
+                // Remove event listener after first use
+                modalElement.removeEventListener('shown.bs.modal', focusAmount);
+            });
+            
+            console.log(`Portfolio modal opened for ${symbol} at $${currentPrice}`);
+            
+        } catch (error) {
+            console.error('Error opening portfolio modal:', error);
+            showAlert('Error opening portfolio form: ' + error.message, 'danger');
+        }
+    }
+    
+    // Submit to portfolio - IMPROVED VERSION with better error handling
+    function submitToPortfolio() {
+        const symbol = document.getElementById('portfolioSymbol').value;
+        const amount = parseFloat(document.getElementById('portfolioAmount').value);
+        const avgPrice = parseFloat(document.getElementById('portfolioAvgPrice').value);
+        
+        // Validation
+        if (!symbol || isNaN(amount) || isNaN(avgPrice) || amount <= 0 || avgPrice <= 0) {
+            showAlert('Please enter valid values for all fields', 'warning');
+            return;
+        }
+        
+        // Get DOM elements
+        const button = document.querySelector('#addToPortfolioModal .btn-success');
+        const modalElement = document.getElementById('addToPortfolioModal');
+        const form = document.getElementById('portfolioForm');
+        
+        if (!button || !modalElement || !form) {
+            console.error('Required DOM elements not found');
+            showAlert('Interface error - please refresh the page', 'danger');
+            return;
+        }
+        
+        const originalText = button.innerHTML;
+        
+        // Show loading state
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+        button.disabled = true;
+        
+        fetch('/portfolio/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                symbol: symbol,
+                amount: amount,
+                avg_price: avgPrice
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status} ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.success) {
+                // Success: Force close modal properly
+                try {
+                    const modal = bootstrap.Modal.getInstance(modalElement);
+                    if (modal) {
+                        modal.hide();
+                    } else {
+                        // Fallback: create new instance and hide
+                        const newModal = new bootstrap.Modal(modalElement);
+                        newModal.hide();
+                    }
+                } catch (error) {
+                    console.warn('Modal close error:', error);
+                    // Force hide modal manually
+                    modalElement.classList.remove('show');
+                    modalElement.style.display = 'none';
+                    modalElement.setAttribute('aria-hidden', 'true');
+                    modalElement.removeAttribute('aria-modal');
+                    modalElement.removeAttribute('role');
+                    document.body.classList.remove('modal-open');
+                    
+                    // Remove backdrop
+                    const backdrop = document.querySelector('.modal-backdrop');
+                    if (backdrop) {
+                        backdrop.remove();
+                    }
+                    
+                    // Reset body style
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                }
+                
+                // Clear form
+                form.reset();
+                
+                // Show success message
+                showAlert(`${symbol} successfully added to portfolio!`, 'success');
+                
+                console.log('Portfolio addition successful:', data);
+                
+            } else {
+                // Server returned an error
+                const errorMsg = data?.message || 'Unknown error occurred';
+                showAlert('Error: ' + errorMsg, 'danger');
+                console.error('Portfolio add failed:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Portfolio add error:', error);
+            showAlert('Network error: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            // Always restore button state
+            if (button) {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        });
+    }
+    
+    // Export to CSV function
+    function exportToCSV() {
+        if (!window.watchlistData || window.watchlistData.length === 0) {
+            showAlert('No data available for export', 'warning');
+            return;
+        }
+        
+        try {
+            // Generate CSV content
+            const headers = ['Rank', 'Symbol', 'Name', 'Bullrun_Score', 'Bullrun_Potential', 'Price_USD', 'Market_Cap_USD'];
+            const csvContent = [
+                headers.join(','),
+                ...window.watchlistData.map((coin, index) => [
+                    index + 1,
+                    coin.symbol,
+                    `"${coin.name}"`,
+                    coin.bullrun_score.toFixed(3),
+                    `"${coin.bullrun_potential}"`,
+                    coin.current_price.toFixed(6),
+                    Math.round(coin.market_cap_usd)
+                ].join(','))
+            ].join('\n');
+            
+            // Create and trigger download
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `crypto_watchlist_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            showAlert('CSV export completed successfully', 'success');
+        } catch (error) {
+            showAlert('Export failed: ' + error.message, 'danger');
+        }
+    }
+    
+    // Store watchlist data globally for export
+    {% if watchlist_analysis and watchlist_analysis.coins %}
+    window.watchlistData = {{ watchlist_analysis.coins | tojson }};
+    {% else %}
+    window.watchlistData = [];
+    {% endif %}
+    
+    // Enhanced modal event handlers
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle escape key for modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const openModal = document.querySelector('.modal.show');
+                if (openModal) {
+                    const modal = bootstrap.Modal.getInstance(openModal);
+                    if (modal) {
+                        modal.hide();
+                    }
+                }
+            }
+        });
+        
+        // Handle backdrop clicks
+        const modalBackdrops = document.querySelectorAll('.modal');
+        modalBackdrops.forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    const modalInstance = bootstrap.Modal.getInstance(this);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    }
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

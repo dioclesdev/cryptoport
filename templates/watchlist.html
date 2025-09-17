@@ -1,0 +1,734 @@
+{% extends "base.html" %}
+
+{% block title %}Watchlist Management - Crypto Bullrun Analyzer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="fas fa-eye"></i> Watchlist Management</h1>
+                <p class="text-muted">Manage your cryptocurrency watchlist ({{ cache_status }})</p>
+            </div>
+            <div class="btn-group">
+                <button type="button" class="btn btn-success" onclick="analyzeWatchlist()">
+                    <i class="fas fa-chart-line"></i> Analyze
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="exportWatchlist()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Left Column: Add Coins and Controls -->
+    <div class="col-md-4">
+        <!-- Add Single Coin -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-plus"></i> Add Coin</h5>
+            </div>
+            <div class="card-body">
+                <form id="add-coin-form">
+                    <div class="mb-3">
+                        <label for="coin-symbol" class="form-label">Symbol (e.g. BTC, ETH)</label>
+                        <input type="text" class="form-control" id="coin-symbol" placeholder="BTC" required 
+                               style="text-transform: uppercase;">
+                        <div class="form-text">Enter cryptocurrency symbol</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-plus"></i> Add to Watchlist
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Bulk Import -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-upload"></i> Bulk Import</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="bulk-symbols" class="form-label">Multiple coins (comma-separated)</label>
+                    <textarea class="form-control" id="bulk-symbols" rows="3" 
+                              placeholder="BTC, ETH, SOL, ADA, DOT"></textarea>
+                    <div class="form-text">Separate symbols with commas</div>
+                </div>
+                <button type="button" class="btn btn-outline-primary w-100" onclick="bulkAddCoins()">
+                    <i class="fas fa-upload"></i> Add All
+                </button>
+            </div>
+        </div>
+
+        <!-- Analysis Controls -->
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line"></i> Analysis</h5>
+            </div>
+            <div class="card-body">
+                <button type="button" class="btn btn-outline-primary w-100 mb-3" onclick="analyzeWatchlist()">
+                    <i class="fas fa-chart-bar"></i> Analyze (Cache)
+                </button>
+                
+                <button type="button" class="btn btn-primary w-100 mb-3" onclick="analyzeWatchlist(true)">
+                    <i class="fas fa-sync-alt"></i> Force Refresh Analysis
+                </button>
+                
+                <hr>
+                
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearWatchlist()">
+                        <i class="fas fa-trash"></i> Clear All
+                    </button>
+                </div>
+                
+                {% if analysis and analysis.coins %}
+                <div class="mt-3 pt-3 border-top">
+                    <h6>Analysis Summary:</h6>
+                    <p><strong>{{ analysis.coins|length }}</strong> coins analyzed</p>
+                    
+                    <!-- Progress Bar -->
+                    <div class="progress mb-2" style="height: 25px;">
+                        {% set total_coins = analysis.coins|length %}
+                        {% if total_coins > 0 %}
+                            {% set very_high = analysis.potential_categories.very_high|length %}
+                            {% set high = analysis.potential_categories.high|length %}
+                            {% set above_avg = analysis.potential_categories.above_average|length %}
+                            {% set average = analysis.potential_categories.average|length %}
+                            {% set below_avg = analysis.potential_categories.below_average|length %}
+                            {% set low = analysis.potential_categories.low|length %}
+                            
+                            {% if very_high > 0 %}
+                            <div class="progress-bar bg-success" style="width: {{ (very_high / total_coins * 100) }}%" 
+                                 title="Very High: {{ very_high }}">{{ very_high }}</div>
+                            {% endif %}
+                            {% if high > 0 %}
+                            <div class="progress-bar bg-info" style="width: {{ (high / total_coins * 100) }}%" 
+                                 title="High: {{ high }}">{{ high }}</div>
+                            {% endif %}
+                            {% if above_avg > 0 %}
+                            <div class="progress-bar bg-warning" style="width: {{ (above_avg / total_coins * 100) }}%" 
+                                 title="Above Average: {{ above_avg }}">{{ above_avg }}</div>
+                            {% endif %}
+                            {% if average > 0 %}
+                            <div class="progress-bar bg-secondary" style="width: {{ (average / total_coins * 100) }}%" 
+                                 title="Average: {{ average }}">{{ average }}</div>
+                            {% endif %}
+                            {% if below_avg > 0 %}
+                            <div class="progress-bar bg-dark" style="width: {{ (below_avg / total_coins * 100) }}%" 
+                                 title="Below Average: {{ below_avg }}">{{ below_avg }}</div>
+                            {% endif %}
+                            {% if low > 0 %}
+                            <div class="progress-bar bg-danger" style="width: {{ (low / total_coins * 100) }}%" 
+                                 title="Low: {{ low }}">{{ low }}</div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    
+                    <div class="text-center">
+                        <a href="/" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-chart-line"></i> View Dashboard
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Column: Watchlist Display -->
+    <div class="col-md-8">
+        <!-- Current Watchlist -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-list"></i> Current Watchlist ({{ watchlist_coins|length }} Coins)</h5>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-primary" onclick="selectAllCoins()">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="deselectAllCoins()">
+                        <i class="fas fa-square"></i> Deselect All
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="removeSelectedCoins()" id="remove-selected-btn" disabled>
+                        <i class="fas fa-trash"></i> Remove Selected
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if watchlist_coins %}
+                <div class="row" id="watchlist-container">
+                    {% for coin in watchlist_coins %}
+                    <div class="col-md-6 mb-2" data-symbol="{{ coin }}">
+                        <div class="watchlist-item border rounded p-3" style="border-left: 4px solid #007bff !important;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="form-check">
+                                    <input class="form-check-input coin-checkbox" type="checkbox" value="{{ coin }}" 
+                                           id="check-{{ coin }}" onchange="updateRemoveButton()">
+                                    <label class="form-check-label" for="check-{{ coin }}">
+                                        <strong>{{ coin }}</strong>
+                                        {% if coin in coin_data %}
+                                        <br><small class="text-muted">{{ coin_data[coin].get('name', 'Loading...') }}</small>
+                                        {% if coin_data[coin].get('price') %}
+                                        <br><small class="text-success">${{ "%.4f"|format(coin_data[coin].price) }}</small>
+                                        {% endif %}
+                                        {% endif %}
+                                    </label>
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-success btn-sm" 
+                                            onclick="addToPortfolio('{{ coin }}', {{ coin_data[coin].get('price', 0) if coin in coin_data else 0 }})"
+                                            title="Add to Portfolio">
+                                        <i class="fas fa-wallet"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" 
+                                            onclick="removeSingleCoin('{{ coin }}')"
+                                            title="Remove from Watchlist">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-eye-slash fa-3x text-muted mb-3"></i>
+                    <h4>Watchlist is Empty</h4>
+                    <p class="text-muted">Add cryptocurrencies to start tracking their potential</p>
+                    <button class="btn btn-primary" onclick="document.getElementById('coin-symbol').focus()">
+                        <i class="fas fa-plus"></i> Add Your First Coin
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Analysis Results Table -->
+        {% if analysis and analysis.coins %}
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-table"></i> Analysis Results</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Rank</th>
+                                <th>Symbol</th>
+                                <th>Name</th>
+                                <th>Score</th>
+                                <th>Potential</th>
+                                <th>Price (USD)</th>
+                                <th>Market Cap</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for coin in analysis.coins %}
+                            <tr>
+                                <td><span class="badge bg-primary">{{ loop.index }}</span></td>
+                                <td><strong>{{ coin.symbol }}</strong></td>
+                                <td>{{ coin.name }}</td>
+                                <td>
+                                    <span class="badge {{ coin.bullrun_score | score_class }}">
+                                        {{ "%.3f"|format(coin.bullrun_score) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge {{ coin.bullrun_potential | potential_badge_class }}">
+                                        {{ coin.bullrun_potential }}
+                                    </span>
+                                </td>
+                                <td>{{ coin.current_price | currency }}</td>
+                                <td>{{ coin.market_cap_usd | currency }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-success" 
+                                                onclick="addToPortfolio('{{ coin.symbol }}', {{ coin.current_price }})"
+                                                title="Add to Portfolio">
+                                            <i class="fas fa-wallet"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" 
+                                                onclick="removeSingleCoin('{{ coin.symbol }}')"
+                                                title="Remove from Watchlist">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add to Portfolio Modal -->
+<div class="modal fade" id="portfolioModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-wallet"></i> Add to Portfolio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="portfolio-form">
+                    <input type="hidden" id="portfolio-symbol">
+                    <div class="mb-3">
+                        <label for="portfolio-amount" class="form-label">Amount</label>
+                        <input type="number" class="form-control" id="portfolio-amount" 
+                               step="0.000001" min="0.000001" required>
+                        <div class="form-text">Number of coins to add</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="portfolio-price" class="form-label">Average Price (USD)</label>
+                        <input type="number" class="form-control" id="portfolio-price" 
+                               step="0.000001" min="0.000001" required>
+                        <div class="form-text">Your average purchase price</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddToPortfolio()">
+                    <i class="fas fa-plus"></i> Add to Portfolio
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Remove Confirmation Modal -->
+<div class="modal fade" id="bulkRemoveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle text-warning"></i> Confirm Removal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove the selected coins from your watchlist?</p>
+                <div id="coins-to-remove"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmBulkRemove()">
+                    <i class="fas fa-trash"></i> Remove Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global variables
+    let selectedCoins = [];
+
+    // Add single coin
+    document.getElementById('add-coin-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const symbol = document.getElementById('coin-symbol').value.toUpperCase().trim();
+        if (!symbol) {
+            showAlert('Please enter a symbol', 'warning');
+            return;
+        }
+        
+        addCoinToWatchlist(symbol);
+    });
+    
+    function addCoinToWatchlist(symbol) {
+        const button = document.querySelector('#add-coin-form button[type="submit"]');
+        const originalText = button.innerHTML;
+        
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+        button.disabled = true;
+        
+        fetch('/watchlist/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({symbol: symbol})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                document.getElementById('coin-symbol').value = '';
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Network error: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+    
+    function bulkAddCoins() {
+        const symbols = document.getElementById('bulk-symbols').value;
+        if (!symbols.trim()) {
+            showAlert('Please enter coin symbols', 'warning');
+            return;
+        }
+        
+        const symbolList = symbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
+        
+        if (symbolList.length === 0) {
+            showAlert('No valid symbols found', 'warning');
+            return;
+        }
+        
+        const button = event.target;
+        const originalText = button.innerHTML;
+        
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+        button.disabled = true;
+        
+        fetch('/watchlist/bulk-add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({symbols: symbolList})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(`${data.added_count} coins added, ${data.skipped_count} skipped`, 'success');
+                document.getElementById('bulk-symbols').value = '';
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Network error: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+    
+    // Verbesserte removeSingleCoin Funktion ohne hängendes Modal
+    function removeSingleCoin(symbol) {
+        if (!confirm(`Remove ${symbol} from watchlist?`)) return;
+        
+        // Visuelles Feedback ohne Modal
+        const coinElement = document.querySelector(`[data-symbol="${symbol}"]`);
+        if (coinElement) {
+            coinElement.style.opacity = '0.5';
+            coinElement.style.pointerEvents = 'none';
+        }
+        
+        fetch('/watchlist/remove', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({symbol: symbol})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Sofort aus DOM entfernen
+                if (coinElement) {
+                    coinElement.remove();
+                }
+                showAlert(`${symbol} removed successfully`, 'success');
+                updateRemoveButton();
+            } else {
+                // Wiederherstellen bei Fehler
+                if (coinElement) {
+                    coinElement.style.opacity = '1';
+                    coinElement.style.pointerEvents = 'auto';
+                }
+                showAlert('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            // Wiederherstellen bei Netzwerkfehler
+            if (coinElement) {
+                coinElement.style.opacity = '1';
+                coinElement.style.pointerEvents = 'auto';
+            }
+            showAlert('Network error occurred', 'danger');
+            console.error('Error:', error);
+        });
+    }
+    
+    function selectAllCoins() {
+        const checkboxes = document.querySelectorAll('.coin-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = true;
+        });
+        updateRemoveButton();
+    }
+    
+    function deselectAllCoins() {
+        const checkboxes = document.querySelectorAll('.coin-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+        });
+        updateRemoveButton();
+    }
+    
+    function updateRemoveButton() {
+        const checkedBoxes = document.querySelectorAll('.coin-checkbox:checked');
+        const removeBtn = document.getElementById('remove-selected-btn');
+        
+        if (checkedBoxes.length > 0) {
+            removeBtn.disabled = false;
+            removeBtn.innerHTML = `<i class="fas fa-trash"></i> Remove Selected (${checkedBoxes.length})`;
+        } else {
+            removeBtn.disabled = true;
+            removeBtn.innerHTML = '<i class="fas fa-trash"></i> Remove Selected';
+        }
+        
+        selectedCoins = Array.from(checkedBoxes).map(cb => cb.value);
+    }
+    
+    function removeSelectedCoins() {
+        const checkedBoxes = document.querySelectorAll('.coin-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            showAlert('No coins selected', 'warning');
+            return;
+        }
+        
+        selectedCoins = Array.from(checkedBoxes).map(cb => cb.value);
+        
+        // Show confirmation modal
+        const coinsToRemoveDiv = document.getElementById('coins-to-remove');
+        coinsToRemoveDiv.innerHTML = '<strong>Coins to remove:</strong><br>' + selectedCoins.join(', ');
+        
+        const modal = new bootstrap.Modal(document.getElementById('bulkRemoveModal'));
+        modal.show();
+    }
+    
+    // Verbesserte Bulk-Remove Funktion
+    function confirmBulkRemove() {
+        if (selectedCoins.length === 0) return;
+        
+        // Modal schließen
+        const modal = bootstrap.Modal.getInstance(document.getElementById('bulkRemoveModal'));
+        modal.hide();
+        
+        // Visuelles Feedback für alle ausgewählten Coins
+        selectedCoins.forEach(symbol => {
+            const coinElement = document.querySelector(`[data-symbol="${symbol}"]`);
+            if (coinElement) {
+                coinElement.style.opacity = '0.5';
+                coinElement.style.pointerEvents = 'none';
+            }
+        });
+        
+        let removedCount = 0;
+        let failedCount = 0;
+        let processed = 0;
+        
+        selectedCoins.forEach(symbol => {
+            fetch('/watchlist/remove', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({symbol: symbol})
+            })
+            .then(response => response.json())
+            .then(data => {
+                processed++;
+                
+                if (data.success) {
+                    removedCount++;
+                    // Sofort aus DOM entfernen
+                    const coinElement = document.querySelector(`[data-symbol="${symbol}"]`);
+                    if (coinElement) {
+                        coinElement.remove();
+                    }
+                } else {
+                    failedCount++;
+                    // Wiederherstellen bei Fehler
+                    const coinElement = document.querySelector(`[data-symbol="${symbol}"]`);
+                    if (coinElement) {
+                        coinElement.style.opacity = '1';
+                        coinElement.style.pointerEvents = 'auto';
+                    }
+                }
+                
+                // Status-Update wenn alle verarbeitet
+                if (processed === selectedCoins.length) {
+                    updateRemoveButton();
+                    
+                    if (removedCount > 0) {
+                        showAlert(`${removedCount} coins removed successfully`, 'success');
+                    }
+                    if (failedCount > 0) {
+                        showAlert(`${failedCount} coins could not be removed`, 'warning');
+                    }
+                }
+            })
+            .catch(error => {
+                processed++;
+                failedCount++;
+                
+                // Wiederherstellen bei Netzwerkfehler
+                const coinElement = document.querySelector(`[data-symbol="${symbol}"]`);
+                if (coinElement) {
+                    coinElement.style.opacity = '1';
+                    coinElement.style.pointerEvents = 'auto';
+                }
+                
+                if (processed === selectedCoins.length) {
+                    updateRemoveButton();
+                    showAlert(`${failedCount} operations failed`, 'danger');
+                }
+            });
+        });
+    }
+    
+    function clearWatchlist() {
+        if (!confirm('Are you sure you want to remove ALL coins from your watchlist? This action cannot be undone.')) {
+            return;
+        }
+        
+        const allCoins = Array.from(document.querySelectorAll('.coin-checkbox')).map(cb => cb.value);
+        
+        if (allCoins.length === 0) {
+            showAlert('Watchlist is already empty', 'info');
+            return;
+        }
+        
+        selectedCoins = allCoins;
+        confirmBulkRemove();
+    }
+    
+    // Verbesserte analyzeWatchlist ohne hängendes Modal
+    function analyzeWatchlist(forceRefresh = false) {
+        const button = event.target;
+        const originalText = button.innerHTML;
+        
+        // Button-State ändern statt Modal
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+        button.disabled = true;
+        
+        fetch('/api/analyze-watchlist', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({force_refresh: forceRefresh})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Analysis completed successfully!', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('Analysis failed: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Network error: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            // Button wiederherstellen
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+    
+    function exportWatchlist() {
+        const watchlistCoins = Array.from(document.querySelectorAll('.coin-checkbox')).map(cb => cb.value);
+        
+        if (watchlistCoins.length === 0) {
+            showAlert("Watchlist is empty. Nothing to export.", 'warning');
+            return;
+        }
+        
+        // Create CSV content
+        const csvContent = "Symbol\n" + watchlistCoins.join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        // Create download link
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `crypto_watchlist_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        
+        // Trigger download
+        link.click();
+        document.body.removeChild(link);
+        
+        showAlert('Watchlist exported successfully!', 'success');
+    }
+    
+    // Portfolio functions
+    function addToPortfolio(symbol, currentPrice) {
+        // Show modal
+        const portfolioModal = new bootstrap.Modal(document.getElementById('portfolioModal'));
+        
+        // Set values
+        document.getElementById('portfolio-symbol').value = symbol;
+        document.getElementById('portfolio-amount').value = "1";
+        document.getElementById('portfolio-price').value = currentPrice || 0;
+        
+        portfolioModal.show();
+    }
+    
+    function submitAddToPortfolio() {
+        const symbol = document.getElementById('portfolio-symbol').value;
+        const amount = parseFloat(document.getElementById('portfolio-amount').value);
+        const avgPrice = parseFloat(document.getElementById('portfolio-price').value);
+        
+        if (!symbol || isNaN(amount) || isNaN(avgPrice) || amount <= 0 || avgPrice <= 0) {
+            showAlert('Please enter valid values.', 'warning');
+            return;
+        }
+        
+        const button = document.querySelector('#portfolioModal .btn-primary');
+        const originalText = button.innerHTML;
+        
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+        button.disabled = true;
+        
+        fetch('/portfolio/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                symbol: symbol,
+                amount: amount,
+                avg_price: avgPrice
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('portfolioModal')).hide();
+                showAlert(`${symbol} successfully added to portfolio.`, 'success');
+            } else {
+                showAlert('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Network error: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+    
+    // Auto-update remove button on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        updateRemoveButton();
+    });
+</script>
+{% endblock %}

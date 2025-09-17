@@ -1,0 +1,38 @@
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache
+cache/
+crypto_cache/
+__pycache__/
+*.pyc
+
+# Personal Data
+*.csv
+*.xlsx
+*.pdf
+
+# Backups
+*.backup
+backup_*/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Logs
+*.log
+logs/

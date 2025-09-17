@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ error_code }} - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="error-container">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 text-center">
+                <!-- Error Icon -->
+                <div class="mb-4">
+                    {% if error_code == 404 %}
+                        <i class="fas fa-search fa-4x text-primary opacity-75"></i>
+                    {% elif error_code == 500 %}
+                        <i class="fas fa-exclamation-circle fa-4x text-danger opacity-75"></i>
+                    {% elif error_code == 403 %}
+                        <i class="fas fa-lock fa-4x text-warning opacity-75"></i>
+                    {% else %}
+                        <i class="fas fa-exclamation-triangle fa-4x text-warning opacity-75"></i>
+                    {% endif %}
+                </div>
+                
+                <!-- Error Code -->
+                <div class="display-1 fw-bold text-primary mb-3">{{ error_code or 'Error' }}</div>
+                
+                <!-- Error Title -->
+                <h1 class="h3 mb-4">
+                    {% if error_code == 404 %}
+                        Page Not Found
+                    {% elif error_code == 500 %}
+                        Server Error
+                    {% elif error_code == 403 %}
+                        Access Denied
+                    {% else %}
+                        {{ error_message or 'Something went wrong' }}
+                    {% endif %}
+                </h1>
+                
+                <!-- Error Message -->
+                <p class="text-muted mb-4">
+                    {% if error_code == 404 %}
+                        The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
+                    {% elif error_code == 500 %}
+                        Our server encountered an internal error and was unable to complete your request.
+                    {% elif error_code == 403 %}
+                        You don't have permission to access this resource.
+                    {% else %}
+                        {{ error_description or 'An unexpected error occurred. Please try again later.' }}
+                    {% endif %}
+                </p>
+                
+                <!-- Action Buttons -->
+                <div class="mb-4">
+                    <a href="/" class="btn btn-primary me-2">
+                        <i class="fas fa-home me-2"></i> Go Home
+                    </a>
+                    
+                    <button onclick="history.back()" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-arrow-left me-2"></i> Go Back
+                    </button>
+                    
+                    <button onclick="location.reload()" class="btn btn-outline-info">
+                        <i class="fas fa-sync-alt me-2"></i> Retry
+                    </button>
+                </div>
+                
+                <!-- Popular Links for 404 -->
+                {% if error_code == 404 %}
+                <div class="mt-5 pt-4 border-top">
+                    <h5 class="mb-3">Popular Pages:</h5>
+                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                        <a href="/" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-chart-line me-2"></i> Dashboard
+                        </a>
+                        <a href="/watchlist" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye me-2"></i> Watchlist
+                        </a>
+                        <a href="/portfolio" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-wallet me-2"></i> Portfolio
+                        </a>
+                        <a href="/top200" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-trophy me-2"></i> Top 200
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Troubleshooting for 500 -->
+                {% if error_code == 500 %}
+                <div class="mt-5 pt-4 border-top">
+                    <h5 class="mb-3">Troubleshooting Tips:</h5>
+                    <ul class="text-start list-unstyled">
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Check if all required modules are installed</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Verify cache directory permissions</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Try clearing your browser cache</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Check system logs for specific error messages</li>
+                    </ul>
+                    <a href="/cache-status" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-database me-2"></i> Check System Status
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-redirect for 404 errors after 60 seconds
+    {% if error_code == 404 %}
+    setTimeout(function() {
+        if (confirm('Would you like to be redirected to the homepage?')) {
+            window.location.href = '/';
+        }
+    }, 60000);
+    {% endif %}
+</script>
+{% endblock %}

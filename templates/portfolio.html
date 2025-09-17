@@ -1,0 +1,727 @@
+{% extends "base.html" %}
+
+{% block title %}Portfolio - Crypto Bullrun Analyzer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i class="fas fa-wallet"></i> Portfolio Management</h1>
+            <div>
+                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addHoldingModal">
+                    <i class="fas fa-plus"></i> Add Holding
+                </button>
+                <button class="btn btn-outline-primary" onclick="refreshData()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+        </div>
+        <p class="text-muted">Track and analyze your cryptocurrency holdings with bullrun potential scores</p>
+    </div>
+</div>
+
+{% if portfolio_analysis and portfolio_analysis.coins %}
+<!-- Portfolio Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                <h3 class="text-success">${{ "{:,.2f}".format(portfolio_analysis.total_value or 0) }}</h3>
+                <p>Total Value</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                {% set profit_loss = portfolio_analysis.profit_loss or 0 %}
+                <h3 class="text-{{ 'success' if profit_loss >= 0 else 'danger' }}">
+                    ${{ "{:+,.2f}".format(profit_loss) }}
+                </h3>
+                <p>Profit/Loss</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                {% set profit_loss_percent = portfolio_analysis.profit_loss_percent or 0 %}
+                <h3 class="text-{{ 'success' if profit_loss_percent >= 0 else 'danger' }}">
+                    {{ "{:+.2f}%".format(profit_loss_percent) }}
+                </h3>
+                <p>P/L Percentage</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                <h3 class="text-info">{{ portfolio_analysis.coins|length }}</h3>
+                <p>Holdings</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Portfolio Holdings Table -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-table"></i> Portfolio Holdings</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="exportPortfolio()">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="analyzePortfolio()">
+                        <i class="fas fa-chart-line"></i> Analyze
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Coin</th>
+                                <th>Amount</th>
+                                <th>Avg Price</th>
+                                <th>Current Price</th>
+                                <th>Value</th>
+                                <th>P&L</th>
+                                <th>Bullrun Score</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for coin in portfolio_analysis.coins %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <strong>{{ coin.symbol }}</strong>
+                                        <small class="text-muted ms-2">{{ coin.name }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="amount-display">{{ "{:,.6f}".format(coin.amount) }}</span>
+                                    <button class="btn btn-sm btn-outline-secondary ms-1" 
+                                            onclick="quickModifyAmount('{{ coin.symbol }}', {{ coin.amount }})"
+                                            title="Quick amount change">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </td>
+                                <td>{{ coin.avg_price|currency }}</td>
+                                <td>{{ coin.current_price|currency }}</td>
+                                <td>{{ coin.value|currency }}</td>
+                                <td>
+                                    <span class="{% if coin.profit_loss > 0 %}text-success{% elif coin.profit_loss < 0 %}text-danger{% endif %}">
+                                        {{ coin.profit_loss|currency }}
+                                        <small>({{ coin.profit_loss_percent|percentage }})</small>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge {{ coin.bullrun_score|score_class }}">
+                                        {{ "%.3f"|format(coin.bullrun_score or 0) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" 
+                                                onclick="editPortfolioPosition('{{ coin.symbol }}', {{ coin.amount }}, {{ coin.avg_price }})"
+                                                title="Edit position">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-success" 
+                                                onclick="addMoreToPosition('{{ coin.symbol }}', {{ coin.current_price }})"
+                                                title="Add more">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" 
+                                                onclick="removeHolding('{{ coin.symbol }}')"
+                                                title="Remove position">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Portfolio Performance Analysis -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-chart-pie"></i> Asset Allocation</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="allocationChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-chart-bar"></i> Performance Overview</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="performanceChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% elif portfolio and portfolio.holdings %}
+<!-- Portfolio without analysis -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-table"></i> Portfolio Holdings ({{ portfolio.holdings|length }})</h5>
+                <button class="btn btn-sm btn-primary" onclick="analyzePortfolio()">
+                    <i class="fas fa-chart-line"></i> Analyze Portfolio
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Amount</th>
+                                <th>Average Price</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for symbol, data in portfolio.holdings.items() %}
+                            <tr>
+                                <td><strong>{{ symbol }}</strong></td>
+                                <td>{{ "{:,.6f}".format(data.amount or 0) }}</td>
+                                <td>${{ "{:,.4f}".format(data.avg_price or 0) }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" onclick="editPortfolioPosition('{{ symbol }}', {{ data.amount }}, {{ data.avg_price }})">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" onclick="removeHolding('{{ symbol }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <button class="btn btn-primary" onclick="analyzePortfolio()">
+                        <i class="fas fa-chart-line"></i> Analyze Portfolio Performance
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- Empty Portfolio -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-wallet fa-3x text-muted mb-3"></i>
+                <h4>Your Portfolio is Empty</h4>
+                <p class="text-muted">Add your cryptocurrency holdings to start tracking performance and bullrun potential.</p>
+                
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addHoldingModal">
+                    <i class="fas fa-plus"></i> Add Your First Holding
+                </button>
+                
+                <div class="mt-4">
+                    <h6>Quick Actions:</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <button class="btn btn-outline-secondary w-100" onclick="importFromWatchlist()">
+                                <i class="fas fa-eye"></i> Import from Watchlist
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#importCsvModal">
+                                <i class="fas fa-upload"></i> Import CSV
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="/hardware" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-lock"></i> Hardware Wallet
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Add Holding Modal -->
+<div class="modal fade" id="addHoldingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus"></i> Add Portfolio Holding</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addHoldingForm">
+                    <div class="mb-3">
+                        <label for="holdingSymbol" class="form-label">Cryptocurrency Symbol</label>
+                        <input type="text" class="form-control" id="holdingSymbol" placeholder="e.g., BTC, ETH" required
+                               style="text-transform: uppercase;">
+                        <div class="form-text">Enter the symbol of the cryptocurrency</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="holdingAmount" class="form-label">Amount</label>
+                        <input type="number" class="form-control" id="holdingAmount" placeholder="0.00000000" 
+                               step="0.00000001" min="0.00000001" required>
+                        <div class="form-text">How much of this cryptocurrency do you own?</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="holdingPrice" class="form-label">Average Purchase Price (USD)</label>
+                        <input type="number" class="form-control" id="holdingPrice" placeholder="0.00" 
+                               step="0.01" min="0.01" required>
+                        <div class="form-text">Average price you paid per unit</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="addHolding()">
+                    <i class="fas fa-plus"></i> Add Holding
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Position Modal -->
+<div class="modal fade" id="editPositionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-edit"></i> Edit Position</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-position-form">
+                    <input type="hidden" id="edit-symbol">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Coin:</strong></label>
+                        <p class="form-control-static" id="edit-symbol-display"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-amount" class="form-label">New Total Amount</label>
+                        <input type="number" class="form-control" id="edit-amount" 
+                               step="0.000001" min="0" required>
+                        <div class="form-text">Total coins you want to hold</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-price" class="form-label">Average Price (USD)</label>
+                        <input type="number" class="form-control" id="edit-price" 
+                               step="0.000001" min="0.000001" required>
+                        <div class="form-text">Your average purchase price per coin</div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Note:</strong> This will replace your current position entirely.
+                        Set amount to 0 to remove the position completely.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updatePortfolioPosition()">
+                    <i class="fas fa-save"></i> Update Position
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Amount Modify Modal -->
+<div class="modal fade" id="quickAmountModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-hashtag"></i> Change Amount</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="quick-amount-form">
+                    <input type="hidden" id="quick-symbol">
+                    <div class="mb-3">
+                        <label for="quick-amount" class="form-label">New Amount</label>
+                        <input type="number" class="form-control" id="quick-amount" 
+                               step="0.000001" min="0" required>
+                        <div class="form-text">
+                            Current: <span id="current-amount-display"></span>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitQuickAmount()">
+                    <i class="fas fa-check"></i> Update
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Import CSV Modal -->
+<div class="modal fade" id="importCsvModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-upload"></i> Import Portfolio from CSV</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="importCsvForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="csvFile" class="form-label">CSV File</label>
+                        <input type="file" class="form-control" id="csvFile" accept=".csv" required>
+                        <div class="form-text">CSV should have columns: Symbol, Amount, Price</div>
+                    </div>
+                    <div class="alert alert-info">
+                        <strong>CSV Format:</strong><br>
+                        Symbol,Amount,Price<br>
+                        BTC,0.5,35000<br>
+                        ETH,2.5,2500<br>
+                        SOL,100,45
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="importCsv()">
+                    <i class="fas fa-upload"></i> Import
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Add single holding
+    function addHolding() {
+        const symbol = document.getElementById('holdingSymbol').value.trim().toUpperCase();
+        const amount = parseFloat(document.getElementById('holdingAmount').value);
+        const avgPrice = parseFloat(document.getElementById('holdingPrice').value);
+        
+        if (!symbol || isNaN(amount) || isNaN(avgPrice) || amount <= 0 || avgPrice <= 0) {
+            showAlert('Please enter valid values for all fields', 'warning');
+            return;
+        }
+        
+        fetch('/portfolio/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                symbol: symbol,
+                amount: amount,
+                avg_price: avgPrice
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('addHoldingModal')).hide();
+                document.getElementById('addHoldingForm').reset();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Network error: ' + error.message, 'danger');
+        });
+    }
+    
+    // Remove holding
+    function removeHolding(symbol) {
+        if (!confirm(`Remove ${symbol} from portfolio?`)) return;
+        
+        fetch('/portfolio/remove', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({symbol: symbol})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Network error: ' + error.message, 'danger');
+        });
+    }
+    
+    // Edit portfolio position
+    function editPortfolioPosition(symbol, currentAmount, currentPrice) {
+        document.getElementById('edit-symbol').value = symbol;
+        document.getElementById('edit-symbol-display').textContent = symbol;
+        document.getElementById('edit-amount').value = currentAmount;
+        document.getElementById('edit-price').value = currentPrice;
+        
+        const modal = new bootstrap.Modal(document.getElementById('editPositionModal'));
+        modal.show();
+    }
+    
+    // Update portfolio position
+    function updatePortfolioPosition() {
+        const symbol = document.getElementById('edit-symbol').value;
+        const amount = parseFloat(document.getElementById('edit-amount').value);
+        const avgPrice = parseFloat(document.getElementById('edit-price').value);
+        
+        if (!symbol || isNaN(amount) || isNaN(avgPrice) || amount < 0 || avgPrice < 0) {
+            showAlert('Please enter valid values.', 'warning');
+            return;
+        }
+        
+        const button = document.querySelector('#editPositionModal .btn-primary');
+        const originalText = button.innerHTML;
+        
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+        button.disabled = true;
+        
+        fetch('/portfolio/update', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                symbol: symbol,
+                amount: amount,
+                avg_price: avgPrice
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('editPositionModal')).hide();
+                showAlert(data.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Network error: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+    
+    // Quick modify amount
+    function quickModifyAmount(symbol, currentAmount) {
+        document.getElementById('quick-symbol').value = symbol;
+        document.getElementById('quick-amount').value = currentAmount;
+        document.getElementById('current-amount-display').textContent = currentAmount;
+        
+        const modal = new bootstrap.Modal(document.getElementById('quickAmountModal'));
+        modal.show();
+    }
+    
+    // Submit quick amount
+    function submitQuickAmount() {
+        const symbol = document.getElementById('quick-symbol').value;
+        const newAmount = parseFloat(document.getElementById('quick-amount').value);
+        
+        if (isNaN(newAmount) || newAmount < 0) {
+            showAlert('Please enter a valid amount.', 'warning');
+            return;
+        }
+        
+        const button = document.querySelector('#quickAmountModal .btn-primary');
+        const originalText = button.innerHTML;
+        
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+        button.disabled = true;
+        
+        fetch('/portfolio/modify-amount', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                symbol: symbol,
+                new_amount: newAmount
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('quickAmountModal')).hide();
+                showAlert(data.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('Error: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Network error: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+    
+    // Add more to existing position
+    function addMoreToPosition(symbol, currentPrice) {
+        document.getElementById('holdingSymbol').value = symbol;
+        document.getElementById('holdingPrice').value = currentPrice || '';
+        const modal = new bootstrap.Modal(document.getElementById('addHoldingModal'));
+        modal.show();
+    }
+    
+    // Analyze portfolio
+    function analyzePortfolio() {
+        showLoading('Analyzing portfolio...', 'Calculating current values and bullrun scores');
+        
+        // Trigger portfolio analysis via refresh
+        refreshData();
+    }
+    
+    // Export portfolio
+    function exportPortfolio() {
+        window.location.href = '/api/export-portfolio';
+    }
+    
+    // Import from watchlist
+    function importFromWatchlist() {
+        showAlert('Import from watchlist functionality would be implemented here', 'info');
+    }
+    
+    // Import CSV
+    function importCsv() {
+        const fileInput = document.getElementById('csvFile');
+        if (!fileInput.files[0]) {
+            showAlert('Please select a CSV file', 'warning');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        
+        showLoading('Importing portfolio...', 'Processing CSV file');
+        
+        fetch('/portfolio/import', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                showAlert(data.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('importCsvModal')).hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showAlert('Import failed: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            showAlert('Import error: ' + error.message, 'danger');
+        });
+    }
+    
+    // Initialize charts if data is available
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if portfolio_analysis and portfolio_analysis.coins %}
+        initializeCharts();
+        {% endif %}
+    });
+    
+    function initializeCharts() {
+        // Allocation pie chart
+        const allocationCtx = document.getElementById('allocationChart');
+        if (allocationCtx) {
+            const portfolioData = {{ portfolio_analysis.coins | tojson if portfolio_analysis else '[]' }};
+            
+            new Chart(allocationCtx, {
+                type: 'pie',
+                data: {
+                    labels: portfolioData.map(coin => coin.symbol),
+                    datasets: [{
+                        data: portfolioData.map(coin => coin.value || 0),
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
+                            '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Performance bar chart
+        const performanceCtx = document.getElementById('performanceChart');
+        if (performanceCtx) {
+            const portfolioData = {{ portfolio_analysis.coins | tojson if portfolio_analysis else '[]' }};
+            
+            new Chart(performanceCtx, {
+                type: 'bar',
+                data: {
+                    labels: portfolioData.map(coin => coin.symbol),
+                    datasets: [{
+                        label: 'P/L %',
+                        data: portfolioData.map(coin => coin.profit_loss_percent || 0),
+                        backgroundColor: portfolioData.map(coin => 
+                            (coin.profit_loss_percent || 0) >= 0 ? '#28a745' : '#dc3545'
+                        )
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+
+{% block title %}Top 200 Analysis - Crypto Bullrun Analyzer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i class="fas fa-trophy"></i> Top 200 Crypto Analysis</h1>
+            <div>
+                {% if top200_available %}
+                <button class="btn btn-success" onclick="runTop200Analysis()">
+                    <i class="fas fa-play"></i> Run Analysis
+                </button>
+                {% endif %}
+                <button class="btn btn-outline-primary" onclick="refreshData()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+        </div>
+        <p class="text-muted">Comprehensive analysis of the top 200 cryptocurrencies by market cap</p>
+    </div>
+</div>
+
+{% if top200_data and top200_data.coins %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                <h3>{{ top200_data.coins|length }}</h3>
+                <p>Coins Analyzed</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                {% set avg_score = (top200_data.coins | sum(attribute='bullrun_score') / top200_data.coins|length) %}
+                <h3>{{ "%.3f"|format(avg_score) }}</h3>
+                <p>Avg. Score</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                {% set high_scores = top200_data.coins | selectattr('bullrun_score', '>=', 0.7) | list %}
+                <h3>{{ high_scores|length }}</h3>
+                <p>High Potential</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                {% set very_high_scores = top200_data.coins | selectattr('bullrun_score', '>=', 0.8) | list %}
+                <h3>{{ very_high_scores|length }}</h3>
+                <p>Very High Potential</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-table"></i> Top 200 Analysis Results</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="exportTop200()">
+                        <i class="fas fa-download"></i> Export CSV
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm crypto-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Symbol</th>
+                                <th>Name</th>
+                                <th>Score</th>
+                                <th>Potential</th>
+                                <th>Price (USD)</th>
+                                <th>Market Cap</th>
+                                <th>24h Change</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for coin in top200_data.coins[:50] %}
+                            <tr>
+                                <td><span class="badge bg-primary">{{ loop.index }}</span></td>
+                                <td><strong>{{ coin.symbol }}</strong></td>
+                                <td>{{ coin.name or coin.symbol }}</td>
+                                <td>
+                                    <span class="{% if coin.bullrun_score >= 0.7 %}score-high{% elif coin.bullrun_score >= 0.5 %}score-medium{% else %}score-low{% endif %}">
+                                        {{ "%.3f"|format(coin.bullrun_score) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if coin.bullrun_score >= 0.7 else 'warning' if coin.bullrun_score >= 0.5 else 'danger' }}">
+                                        {{ coin.bullrun_potential or 'Unknown' }}
+                                    </span>
+                                </td>
+                                <td>${{ "%.4f"|format(coin.current_price_usd or coin.current_price or 0) }}</td>
+                                <td>${{ "{:,}".format((coin.market_cap_usd or 0)|int) }}</td>
+                                <td>
+                                    {% set change_24h = coin.get('price_change_24h', 0) %}
+                                    <span class="text-{{ 'success' if change_24h >= 0 else 'danger' }}">
+                                        {{ "{:+.2f}%".format(change_24h) }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {% if top200_data.coins|length > 50 %}
+                <div class="text-center mt-3">
+                    <p class="text-muted">Showing top 50 results. Total analyzed: {{ top200_data.coins|length }} coins</p>
+                    <button class="btn btn-outline-primary" onclick="showAllResults()">
+                        <i class="fas fa-eye"></i> Show All Results
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if top200_data.potential_categories %}
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-filter"></i> Distribution by Potential</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% if top200_data.potential_categories.very_high %}
+                    <div class="col-md-2 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-success text-white text-center">
+                                <strong>Very High</strong><br>
+                                <small>({{ top200_data.potential_categories.very_high|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in top200_data.potential_categories.very_high[:10] %}
+                                <span class="badge bg-success m-1">{{ symbol }}</span>
+                                {% endfor %}
+                                {% if top200_data.potential_categories.very_high|length > 10 %}
+                                <small class="text-muted">+{{ top200_data.potential_categories.very_high|length - 10 }} more</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if top200_data.potential_categories.high %}
+                    <div class="col-md-2 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-info text-white text-center">
+                                <strong>High</strong><br>
+                                <small>({{ top200_data.potential_categories.high|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in top200_data.potential_categories.high[:10] %}
+                                <span class="badge bg-info m-1">{{ symbol }}</span>
+                                {% endfor %}
+                                {% if top200_data.potential_categories.high|length > 10 %}
+                                <small class="text-muted">+{{ top200_data.potential_categories.high|length - 10 }} more</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if top200_data.potential_categories.above_average %}
+                    <div class="col-md-2 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-warning text-center">
+                                <strong>Above Avg</strong><br>
+                                <small>({{ top200_data.potential_categories.above_average|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in top200_data.potential_categories.above_average[:10] %}
+                                <span class="badge bg-warning text-dark m-1">{{ symbol }}</span>
+                                {% endfor %}
+                                {% if top200_data.potential_categories.above_average|length > 10 %}
+                                <small class="text-muted">+{{ top200_data.potential_categories.above_average|length - 10 }} more</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if top200_data.potential_categories.average %}
+                    <div class="col-md-2 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white text-center">
+                                <strong>Average</strong><br>
+                                <small>({{ top200_data.potential_categories.average|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in top200_data.potential_categories.average[:10] %}
+                                <span class="badge bg-secondary m-1">{{ symbol }}</span>
+                                {% endfor %}
+                                {% if top200_data.potential_categories.average|length > 10 %}
+                                <small class="text-muted">+{{ top200_data.potential_categories.average|length - 10 }} more</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if top200_data.potential_categories.below_average %}
+                    <div class="col-md-2 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-dark text-white text-center">
+                                <strong>Below Avg</strong><br>
+                                <small>({{ top200_data.potential_categories.below_average|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in top200_data.potential_categories.below_average[:10] %}
+                                <span class="badge bg-dark m-1">{{ symbol }}</span>
+                                {% endfor %}
+                                {% if top200_data.potential_categories.below_average|length > 10 %}
+                                <small class="text-muted">+{{ top200_data.potential_categories.below_average|length - 10 }} more</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if top200_data.potential_categories.low %}
+                    <div class="col-md-2 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-danger text-white text-center">
+                                <strong>Low</strong><br>
+                                <small>({{ top200_data.potential_categories.low|length }})</small>
+                            </div>
+                            <div class="card-body p-2">
+                                {% for symbol in top200_data.potential_categories.low[:10] %}
+                                <span class="badge bg-danger m-1">{{ symbol }}</span>
+                                {% endfor %}
+                                {% if top200_data.potential_categories.low|length > 10 %}
+                                <small class="text-muted">+{{ top200_data.potential_categories.low|length - 10 }} more</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- No Data Available -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-trophy fa-3x text-muted mb-3"></i>
+                <h4>No Top 200 Analysis Available</h4>
+                <p class="text-muted">No analysis data found. 
+                {% if top200_available %}
+                Click "Run Analysis" to start a new Top 200 analysis.
+                {% else %}
+                The Top 200 analyzer is not available in this configuration.
+                {% endif %}
+                </p>
+                
+                {% if top200_available %}
+                <button class="btn btn-primary" onclick="runTop200Analysis()">
+                    <i class="fas fa-play"></i> Run Top 200 Analysis
+                </button>
+                {% endif %}
+                
+                {% if top200_files and top200_files|length > 0 %}
+                <div class="mt-4">
+                    <h6>Available Analysis Files:</h6>
+                    <div class="list-group">
+                        {% for file in top200_files[:5] %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ file.name }}</strong><br>
+                                <small class="text-muted">{{ file.modified.strftime('%Y-%m-%d %H:%M') }} - {{ "%.1f"|format(file.size/1024) }} KB</small>
+                            </div>
+                            <a href="/load-analysis?file={{ file.path }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-upload"></i> Load
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    {% if top200_files|length > 5 %}
+                    <div class="mt-2">
+                        <a href="/cache-status" class="btn btn-sm btn-outline-secondary">
+                            View All Files ({{ top200_files|length }} total)
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Analysis Status -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-info-circle"></i> Analysis Information</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>Top 200 Analyzer:</strong></td>
+                        <td>
+                            {% if top200_available %}
+                            <span class="badge bg-success">Available</span>
+                            {% else %}
+                            <span class="badge bg-danger">Not Available</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cache Files:</strong></td>
+                        <td>{{ top200_files|length if top200_files else 0 }} found</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Last Analysis:</strong></td>
+                        <td>
+                            {% if top200_files and top200_files|length > 0 %}
+                            {{ top200_files[0].modified.strftime('%Y-%m-%d %H:%M') }}
+                            {% else %}
+                            Never
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Data Source:</strong></td>
+                        <td>
+                            {% if top200_data %}
+                            Cached Analysis
+                            {% else %}
+                            No Data
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-cog"></i> Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if top200_available %}
+                    <button class="btn btn-primary" onclick="runTop200Analysis()">
+                        <i class="fas fa-play"></i> Run New Analysis
+                    </button>
+                    {% endif %}
+                    
+                    <button class="btn btn-outline-primary" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i> Refresh Data
+                    </button>
+                    
+                    <a href="/cache-status" class="btn btn-outline-secondary">
+                        <i class="fas fa-database"></i> View Cache Status
+                    </a>
+                    
+                    {% if top200_data %}
+                    <button class="btn btn-outline-success" onclick="exportTop200()">
+                        <i class="fas fa-download"></i> Export Results
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function runTop200Analysis() {
+        showLoading('Running Top 200 Analysis...', 'This may take several minutes to complete');
+        
+        fetch('/api/run-top200', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                showAlert(`Analysis completed! ${data.successful_analyses} coins analyzed in ${data.duration_seconds}s`, 'success');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showAlert('Analysis failed: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            showAlert('Error running analysis: ' + error.message, 'danger');
+        });
+    }
+    
+    function exportTop200() {
+        window.location.href = '/api/export-top200';
+    }
+    
+    function showAllResults() {
+        // Could implement pagination or show more results
+        showAlert('Full results view would be implemented here', 'info');
+    }
+</script>
+{% endblock %}
