@@ -16,7 +16,7 @@
         </div>
         {% if last_update %}
         <small class="text-muted">
-            <i class="fas fa-clock"></i> Last update: {{ last_update | replace('T', ' ') }}
+            <i class="fas fa-clock"></i> Last update: {{ last_update | replace('T', ' ') | truncate(19, True, '') }}
         </small>
         {% endif %}
     </div>
@@ -156,12 +156,12 @@
                                     <span class="text-dark">{{ coin.name }}</span>
                                 </td>
                                 <td>
-                                    <span class="score-badge {{ getScoreClass(coin.bullrun_score) }}">
+                                    <span class="score-badge {% if coin.bullrun_score >= 0.8 %}bg-success{% elif coin.bullrun_score >= 0.7 %}bg-info{% elif coin.bullrun_score >= 0.6 %}bg-warning{% elif coin.bullrun_score >= 0.5 %}bg-secondary{% else %}bg-danger{% endif %}">
                                         {{ "%.3f"|format(coin.bullrun_score) }}
                                     </span>
                                 </td>
                                 <td>
-                                    <span class="badge {{ getPotentialClass(coin.bullrun_potential) }}">
+                                    <span class="badge {% if coin.bullrun_potential == 'Sehr hoch' %}bg-success{% elif coin.bullrun_potential == 'Hoch' %}bg-info{% elif coin.bullrun_potential == 'Überdurchschnittlich' or coin.bullrun_potential == 'Ue̓berdurchschnittlich' %}bg-warning{% elif coin.bullrun_potential == 'Durchschnittlich' %}bg-secondary{% elif coin.bullrun_potential == 'Unterdurchschnittlich' %}bg-dark{% else %}bg-danger{% endif %}">
                                         {{ coin.bullrun_potential }}
                                     </span>
                                 </td>
@@ -599,7 +599,7 @@
         window.open(url, '_blank');
     }
     
-    // Add to portfolio function - IMPROVED VERSION
+    // Add to portfolio function
     function addToPortfolio(symbol, currentPrice) {
         if (!symbol || !currentPrice) {
             showAlert('Invalid coin data', 'warning');
@@ -662,7 +662,7 @@
         }
     }
     
-    // Submit to portfolio - IMPROVED VERSION with better error handling
+    // Submit to portfolio
     function submitToPortfolio() {
         const symbol = document.getElementById('portfolioSymbol').value;
         const amount = parseFloat(document.getElementById('portfolioAmount').value);
@@ -674,23 +674,14 @@
             return;
         }
         
-        // Get DOM elements
-        const button = document.querySelector('#addToPortfolioModal .btn-success');
-        const modalElement = document.getElementById('addToPortfolioModal');
-        const form = document.getElementById('portfolioForm');
+        // Get submit button for loading state
+        const submitBtn = document.querySelector('#addToPortfolioModal .btn-success');
+        const originalText = submitBtn.innerHTML;
         
-        if (!button || !modalElement || !form) {
-            console.error('Required DOM elements not found');
-            showAlert('Interface error - please refresh the page', 'danger');
-            return;
-        }
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+        submitBtn.disabled = true;
         
-        const originalText = button.innerHTML;
-        
-        // Show loading state
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
-        button.disabled = true;
-        
+        // Submit to portfolio
         fetch('/portfolio/add', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -700,145 +691,35 @@
                 avg_price: avgPrice
             })
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.status} ${response.statusText}`);
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            if (data && data.success) {
-                // Success: Force close modal properly
-                try {
-                    const modal = bootstrap.Modal.getInstance(modalElement);
-                    if (modal) {
-                        modal.hide();
-                    } else {
-                        // Fallback: create new instance and hide
-                        const newModal = new bootstrap.Modal(modalElement);
-                        newModal.hide();
-                    }
-                } catch (error) {
-                    console.warn('Modal close error:', error);
-                    // Force hide modal manually
-                    modalElement.classList.remove('show');
-                    modalElement.style.display = 'none';
-                    modalElement.setAttribute('aria-hidden', 'true');
-                    modalElement.removeAttribute('aria-modal');
-                    modalElement.removeAttribute('role');
-                    document.body.classList.remove('modal-open');
-                    
-                    // Remove backdrop
-                    const backdrop = document.querySelector('.modal-backdrop');
-                    if (backdrop) {
-                        backdrop.remove();
-                    }
-                    
-                    // Reset body style
-                    document.body.style.overflow = '';
-                    document.body.style.paddingRight = '';
-                }
-                
-                // Clear form
-                form.reset();
+            if (data.success) {
+                // Hide modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addToPortfolioModal'));
+                modal.hide();
                 
                 // Show success message
-                showAlert(`${symbol} successfully added to portfolio!`, 'success');
+                showAlert(`${symbol} added to portfolio successfully!`, 'success');
                 
-                console.log('Portfolio addition successful:', data);
-                
+                // Reset form
+                document.getElementById('portfolioForm').reset();
             } else {
-                // Server returned an error
-                const errorMsg = data?.message || 'Unknown error occurred';
-                showAlert('Error: ' + errorMsg, 'danger');
-                console.error('Portfolio add failed:', data);
+                showAlert('Error adding to portfolio: ' + data.message, 'danger');
             }
         })
         .catch(error => {
-            console.error('Portfolio add error:', error);
             showAlert('Network error: ' + error.message, 'danger');
         })
         .finally(() => {
-            // Always restore button state
-            if (button) {
-                button.innerHTML = originalText;
-                button.disabled = false;
-            }
+            // Reset button state
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
         });
     }
     
-    // Export to CSV function
+    // Export watchlist to CSV
     function exportToCSV() {
-        if (!window.watchlistData || window.watchlistData.length === 0) {
-            showAlert('No data available for export', 'warning');
-            return;
-        }
-        
-        try {
-            // Generate CSV content
-            const headers = ['Rank', 'Symbol', 'Name', 'Bullrun_Score', 'Bullrun_Potential', 'Price_USD', 'Market_Cap_USD'];
-            const csvContent = [
-                headers.join(','),
-                ...window.watchlistData.map((coin, index) => [
-                    index + 1,
-                    coin.symbol,
-                    `"${coin.name}"`,
-                    coin.bullrun_score.toFixed(3),
-                    `"${coin.bullrun_potential}"`,
-                    coin.current_price.toFixed(6),
-                    Math.round(coin.market_cap_usd)
-                ].join(','))
-            ].join('\n');
-            
-            // Create and trigger download
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `crypto_watchlist_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-            
-            showAlert('CSV export completed successfully', 'success');
-        } catch (error) {
-            showAlert('Export failed: ' + error.message, 'danger');
-        }
+        window.location.href = '/api/export/watchlist';
     }
-    
-    // Store watchlist data globally for export
-    {% if watchlist_analysis and watchlist_analysis.coins %}
-    window.watchlistData = {{ watchlist_analysis.coins | tojson }};
-    {% else %}
-    window.watchlistData = [];
-    {% endif %}
-    
-    // Enhanced modal event handlers
-    document.addEventListener('DOMContentLoaded', function() {
-        // Handle escape key for modal
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                const openModal = document.querySelector('.modal.show');
-                if (openModal) {
-                    const modal = bootstrap.Modal.getInstance(openModal);
-                    if (modal) {
-                        modal.hide();
-                    }
-                }
-            }
-        });
-        
-        // Handle backdrop clicks
-        const modalBackdrops = document.querySelectorAll('.modal');
-        modalBackdrops.forEach(modal => {
-            modal.addEventListener('click', function(e) {
-                if (e.target === this) {
-                    const modalInstance = bootstrap.Modal.getInstance(this);
-                    if (modalInstance) {
-                        modalInstance.hide();
-                    }
-                }
-            });
-        });
-    });
 </script>
 {% endblock %}
