@@ -165,33 +165,6 @@ This is a personal project, but suggestions and bug reports are welcome! Please 
 
 The application runs well on a Raspberry Pi or any Linux server for personal use.
 
-### Production Tips
-
-1. Use a proper WSGI server (Gunicorn)
-2. Set up a reverse proxy (Nginx)
-3. Use PostgreSQL for better performance
-4. Enable HTTPS with Let's Encrypt
-5. Set `DEBUG=False` in production
-
-## Roadmap
-
-Future improvements I'm considering:
-
-- [ ] DeFi integration
-- [ ] Advanced charting
-- [ ] Price alerts via email
-- [ ] Tax report generation
-- [ ] Mobile-responsive improvements
-- [ ] Dark mode
-- [ ] Multiple portfolio support
-
-## Security Notes
-
-- Never commit `.env` files
-- Keep API keys secure
-- Use strong SECRET_KEY in production
-- Regular dependency updates
-
 ## License
 
 This project is open source under the MIT License. See [LICENSE](LICENSE) file for details.
